@@ -2,10 +2,18 @@ package com.stevechulsdev.network
 
 import android.content.Context
 import android.net.ConnectivityManager
+import android.net.Network
 import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.os.Build
+import android.util.Log
+import androidx.annotation.RequiresApi
 
 object ScNetwork {
+    private val TAG: String = javaClass.simpleName
+
+    private var mConnectivityManager: ConnectivityManager? = null
+    private var mNetworkCallback: ConnectivityManager.NetworkCallback? = null
 
     /**
      * 1회성 네트워크 연결 유무 확인
@@ -33,5 +41,58 @@ object ScNetwork {
             }
         }
         return false
+    }
+
+    /**
+     * 앱 실행 중에 인터넷 연결 여부를 지속적으로 확인 할 수 있습니다.
+     * @param context Context
+     * @param networkInterface 연결 유무에 따른 Interface
+     */
+    @RequiresApi(21)
+    fun checkNetworkRealTime(context: Context, networkInterface: NetworkInterface) {
+        mConnectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val builder = NetworkRequest.Builder()
+
+        mNetworkCallback = object  : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                super.onAvailable(network)
+                Log.i(TAG, "Network onAvailable")
+                networkInterface.onNetworkAvailable()
+            }
+
+            override fun onLost(network: Network) {
+                super.onLost(network)
+                Log.i(TAG, "Network onLost")
+                networkInterface.onNetworkLost()
+            }
+        }
+
+        mConnectivityManager?.let { connectivityManager ->
+            mNetworkCallback?.let { networkCallback ->
+                connectivityManager.registerNetworkCallback(builder.build(), networkCallback)
+            } ?: run {
+                Log.e(TAG, "ConnectivityManager.NetworkCallback is null")
+            }
+        } ?: run {
+            Log.e(TAG, "ConnectivityManager is null")
+        }
+    }
+
+    @RequiresApi(21)
+    fun removeCheckNetworkRealTime() {
+        mConnectivityManager?.let { connectivityManager ->
+            mNetworkCallback?.let { networkCallback ->
+                connectivityManager.unregisterNetworkCallback(networkCallback)
+            } ?: run {
+                Log.e(TAG, "ConnectivityManager.NetworkCallback is null")
+            }
+        } ?: run {
+            Log.e(TAG, "ConnectivityManager is null")
+        }
+    }
+
+    interface NetworkInterface {
+        fun onNetworkAvailable()
+        fun onNetworkLost()
     }
 }
